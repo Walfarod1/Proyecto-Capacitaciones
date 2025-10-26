@@ -732,14 +732,14 @@
                 bubble.style.width = `${size}px`;
                 bubble.style.height = `${size}px`;
                 bubble.style.left = `${Math.random() * 100}%`;
-                const animationDuration = Math.random() * 12 + 8; 
+                const animationDuration = Math.random() * 5 + 5; 
                 bubble.style.animationDuration = `${animationDuration}s`;
                 const animationDelay = Math.random() * 0.2;
                 bubble.style.animationDelay = `${animationDelay}s`;
                 bubblesContainer.appendChild(bubble);
                 bubble.addEventListener('animationend', () => { bubble.remove(); });
             }
-            setInterval(createBubble, 2000); 
+            setInterval(createBubble, 2500); 
             for (let i = 0; i < 5; i++) { createBubble(); }
             // --- FIN Código de Burbujas ---
 
@@ -759,4 +759,5 @@
 </body>
 
 </html>
+
 
