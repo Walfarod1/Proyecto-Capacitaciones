@@ -26,7 +26,14 @@
           src: url('https://raw.githubusercontent.com/Walfarod1/Fuentes/main/beatles.TTF') format('truetype'); 
         }
 
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; position: relative; z-index: 10; }
+       .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 20px 200px 20px; /* Arriba Izq/Der Abajo */
+            /* Añadimos 200px de padding SÓLO en la parte inferior */
+            position: relative;
+            z-index: 10;
+        }
         header { text-align: center; padding: 20px 0; margin-bottom: 30px; }
         .logo {
             font-family: 'Beatles Font', sans-serif;
@@ -750,4 +757,5 @@
         });
     </script>
 </body>
+
 </html>
