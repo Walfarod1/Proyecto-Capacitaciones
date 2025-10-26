@@ -1,0 +1,435 @@
+// --- CONFIGURACIÓN ---
+const HOJA_INTERNOS = "PLAN DE FORMACIÓN TAR";
+const HOJA_CONTRATISTAS = "CONTRATISTAS";
+const HEADER_ROW_NUMBER = 4; // Fila donde están los encabezados (CODIGO, NOMBRE, etc.)
+const DATA_START_ROW_NUMBER = 5; // Fila donde empiezan los datos reales
+// -----------------------
+
+/**
+ * Función GET principal:
+ * - Si tiene parámetro 'action=getCourses', devuelve la lista de cursos.
+ * - Si tiene parámetro 'codigo', busca un empleado (lógica existente).
+ */
+function doGet(e) {
+  Logger.log("doGet iniciado con parámetros: " + JSON.stringify(e)); // Log para depuración
+  try {
+    const params = e.parameter;
+
+    // --- ACCIÓN: OBTENER LISTA DE CURSOS ---
+    if (params.action === 'getCourses') {
+      return getCourseList();
+    }
+
+    // --- ACCIÓN: BÚSQUEDA DE EMPLEADO ---
+    const searchValue = params.codigo; // El valor del input (código o cédula)
+    const tipo = params.tipo || 'interno'; // 'interno' o 'contratista'
+
+    if (!searchValue) {
+      Logger.log("Error: No se proporcionó código o cédula.");
+      return crearRespuestaJSON({ error: "No se proporcionó código o cédula." }, 400);
+    }
+
+    // Determinar hoja y nombres de columna según el tipo
+    let sheetName = (tipo === 'contratista') ? HOJA_CONTRATISTAS : HOJA_INTERNOS;
+    let idColumnName = (tipo === 'contratista') ? "CEDULA" : "CODIGO";
+    let infoColumnName = (tipo === 'contratista') ? "EMPRESA" : "DEPARTAMENTO";
+    let infoKeyName = "departamento"; // Clave JSON consistente para el frontend
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName(sheetName);
+
+    if (!hoja) {
+      Logger.log("Error: Hoja no encontrada - " + sheetName);
+      return crearRespuestaJSON({ error: "Hoja de cálculo no encontrada: " + sheetName }, 500);
+    }
+
+    // --- LÓGICA DE LECTURA MEJORADA ---
+    const headers = hoja.getRange(HEADER_ROW_NUMBER, 1, 1, hoja.getLastColumn()).getValues()[0];
+    const lastRow = hoja.getLastRow();
+    // Validar si hay datos antes de intentar leerlos
+    if (lastRow < DATA_START_ROW_NUMBER) {
+       Logger.log("Error: No hay datos en la hoja - " + sheetName);
+       return crearRespuestaJSON({ error: "No hay datos en la hoja." }, 404);
+    }
+    // Asegurar leer el rango correcto incluso si solo hay una fila de datos
+    const numDataRows = lastRow - DATA_START_ROW_NUMBER + 1;
+    const datosUsuarios = hoja.getRange(DATA_START_ROW_NUMBER, 1, numDataRows, hoja.getLastColumn()).getValues();
+    // --- FIN LÓGICA MEJORADA ---
+
+    // Mapeo de índices de columnas
+    const colIndex = {
+      id: headers.indexOf(idColumnName),
+      nombre: headers.indexOf('NOMBRE'),
+      info: headers.indexOf(infoColumnName)
+    };
+
+    if (colIndex.id === -1 || colIndex.nombre === -1 || colIndex.info === -1) {
+      Logger.log(`Error: Columnas no encontradas. Se buscó: ${idColumnName}, NOMBRE, ${infoColumnName} en hoja ${sheetName}`);
+      return crearRespuestaJSON({ error: `Columnas no encontradas. Se buscó: ${idColumnName}, NOMBRE, ${infoColumnName}` }, 500);
+    }
+
+    // Búsqueda del Usuario
+    let usuarioEncontrado = null;
+    let filaEncontrada = null;
+
+    Logger.log(`Buscando valor '${searchValue}' en columna ${idColumnName} (${colIndex.id}) de hoja ${sheetName}`);
+    for (const fila of datosUsuarios) {
+      const idCellValue = String(fila[colIndex.id]).trim();
+      const searchValueTrimmed = String(searchValue).trim();
+      if (idCellValue.toUpperCase() === searchValueTrimmed.toUpperCase()) {
+        usuarioEncontrado = {
+          codigo: fila[colIndex.id], // Usamos 'codigo' como clave genérica para el frontend
+          nombre: fila[colIndex.nombre],
+          [infoKeyName]: fila[colIndex.info] // 'departamento' para el frontend
+        };
+        filaEncontrada = fila;
+        Logger.log("Usuario encontrado: " + JSON.stringify(usuarioEncontrado));
+        break;
+      }
+    }
+
+    if (!usuarioEncontrado) {
+      Logger.log("Usuario no encontrado.");
+      return crearRespuestaJSON({ error: "Usuario no encontrado." }, 404);
+    }
+
+    // Lectura de Cursos
+    const cursosDelUsuario = [];
+    const startColumnIndex = colIndex.info + 1; // Columna D en adelante
+
+    for (let i = startColumnIndex; i < headers.length; i++) {
+      const nombreCurso = headers[i];
+      // Si el encabezado no está vacío y NO es 'ESTADO'
+      if (nombreCurso && String(nombreCurso).trim().toUpperCase() !== 'ESTADO') {
+        const fechaRealizacion = filaEncontrada[i];
+        // El estado está en la siguiente columna (i+1), si existe
+        const estado = (i + 1 < headers.length) ? filaEncontrada[i + 1] : 'N/A';
+
+        cursosDelUsuario.push({
+          nombre: nombreCurso,
+          fechaRealizacion: formatarFecha(fechaRealizacion), // Usar función helper
+          estado: estado || 'N/A', // Si la celda de estado está vacía
+          fechaVencimiento: 'N/A' // No tenemos esta columna por curso
+        });
+
+        // Nos saltamos la columna "ESTADO" que acabamos de leer
+        i++;
+      }
+    }
+
+    // Combinar datos y enviar respuesta
+    const respuesta = {
+      ...usuarioEncontrado,
+      cursos: cursosDelUsuario
+    };
+
+    Logger.log("doGet completado exitosamente. Respuesta: " + JSON.stringify(respuesta));
+    return crearRespuestaJSON(respuesta);
+
+  } catch (error) {
+    Logger.log("doGet falló con error: " + error.message + " Stack: " + error.stack);
+    return crearRespuestaJSON({ error: "Error interno del servidor: " + error.message }, 500);
+  }
+}
+
+/**
+ * Función POST principal:
+ * - Detecta si es 'registrationType=interno' o 'contratista'
+ * - Llama a la función de ayuda correspondiente.
+ */
+function doPost(e) {
+  Logger.log("doPost iniciado con datos: " + JSON.stringify(e.postData.contents));
+  try {
+    // Es importante parsear el contenido JSON enviado desde el fetch
+    const datos = JSON.parse(e.postData.contents);
+
+    // --- ENRUTADOR DE REGISTRO ---
+    if (datos.registrationType === 'interno') {
+      return registerInternalCourse(datos);
+    } else {
+      // Por defecto o si es 'contratista'
+      return registerContractor(datos);
+    }
+
+  } catch (error) {
+    Logger.log("doPost falló con error: " + error.message + " Stack: " + error.stack);
+    return crearRespuestaJSON({ status: "error", message: "Error al procesar registro: " + error.message }, 500);
+  }
+}
+
+// --- FUNCIÓN DE AYUDA: OBTENER LISTA DE CURSOS ---
+function getCourseList() {
+  Logger.log("getCourseList iniciado.");
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    // Usamos la hoja de Internos como maestra para los nombres de cursos
+    const hoja = ss.getSheetByName(HOJA_INTERNOS);
+    if (!hoja) {
+      Logger.log("Error: Hoja maestra de cursos no encontrada: " + HOJA_INTERNOS);
+      return crearRespuestaJSON({ error: "Hoja maestra de cursos no encontrada: " + HOJA_INTERNOS }, 500);
+    }
+
+    // Leer solo la fila de encabezados
+    const headers = hoja.getRange(HEADER_ROW_NUMBER, 1, 1, hoja.getLastColumn()).getValues()[0];
+    const colDeptoIndex = headers.indexOf('DEPARTAMENTO'); // Columna C
+
+    if (colDeptoIndex === -1) {
+       Logger.log("Error: Columna DEPARTAMENTO no encontrada en " + HOJA_INTERNOS);
+       return crearRespuestaJSON({ error: "Columna DEPARTAMENTO no encontrada en hoja maestra." }, 500);
+    }
+
+    const courses = [];
+    // Recorremos los encabezados DESPUÉS de DEPARTAMENTO (desde Col D)
+    for (let i = colDeptoIndex + 1; i < headers.length; i++) {
+      const headerName = String(headers[i]).trim();
+      // Si no está vacío y no es "ESTADO", es un curso
+      if (headerName && headerName.toUpperCase() !== 'ESTADO') {
+        courses.push(headers[i]); // Guardamos el nombre original con espacios si los tiene
+      }
+      // Nos saltamos la columna de ESTADO que le sigue (si la hay)
+      i++;
+    }
+    Logger.log("Cursos encontrados: " + JSON.stringify(courses));
+    return crearRespuestaJSON(courses); // Devolver array de nombres de cursos
+  } catch (error) {
+     Logger.log("getCourseList falló con error: " + error.message + " Stack: " + error.stack);
+     return crearRespuestaJSON({ error: "Error obteniendo lista de cursos: " + error.message }, 500);
+  }
+}
+
+// --- FUNCIÓN DE AYUDA: REGISTRAR CURSO INTERNO ---
+function registerInternalCourse(datos) {
+  Logger.log("registerInternalCourse iniciado con datos: " + JSON.stringify(datos));
+  // Validación de datos de entrada
+  if (!datos.codigo || !datos.curso || !datos.fecha) {
+    Logger.log("Error: Faltan datos (Código, Curso o Fecha).");
+    return crearRespuestaJSON({ status: "error", message: "Faltan datos (Código, Curso o Fecha)." }, 400);
+  }
+  // Si no se proveen nombre o depto, se usarán para nuevos usuarios
+  const nombreNuevo = datos.nombre || "N/A";
+  const deptoNuevo = datos.depto || "N/A";
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName(HOJA_INTERNOS);
+    if (!hoja) {
+       Logger.log("Error: Hoja no encontrada: " + HOJA_INTERNOS);
+       return crearRespuestaJSON({ status: "error", message: "Hoja no encontrada: " + HOJA_INTERNOS }, 500);
+    }
+
+    // Leer encabezados y datos
+    const headers = hoja.getRange(HEADER_ROW_NUMBER, 1, 1, hoja.getLastColumn()).getValues()[0];
+    const lastRow = hoja.getLastRow();
+    const numDataRows = (lastRow >= DATA_START_ROW_NUMBER) ? lastRow - DATA_START_ROW_NUMBER + 1 : 0;
+    const datosUsuarios = (numDataRows > 0)
+      ? hoja.getRange(DATA_START_ROW_NUMBER, 1, numDataRows, hoja.getLastColumn()).getValues()
+      : []; // Array vacío si no hay datos
+
+    // Encontrar las columnas clave
+    const colCodigoIndex = headers.indexOf('CODIGO');
+    const colNombreIndex = headers.indexOf('NOMBRE');
+    const colDeptoIndex = headers.indexOf('DEPARTAMENTO');
+    const colCursoIndex = headers.indexOf(datos.curso); // Busca el nombre exacto del curso
+
+    if (colCodigoIndex === -1 || colNombreIndex === -1 || colDeptoIndex === -1) {
+       Logger.log("Error: Columnas CODIGO, NOMBRE o DEPARTAMENTO no encontradas.");
+       return crearRespuestaJSON({ status: "error", message: `Columnas básicas no encontradas en ${HOJA_INTERNOS}` }, 500);
+    }
+    if (colCursoIndex === -1) {
+       Logger.log(`Error: Curso '${datos.curso}' no encontrado como encabezado.`);
+       return crearRespuestaJSON({ status: "error", message: `Nombre de curso no encontrado en la hoja: ${datos.curso}` }, 400);
+    }
+
+    let userFound = false;
+    // Es crucial convertir la fecha del formulario a un objeto Date de Apps Script
+    const nuevaFecha = new Date(datos.fecha);
+    if (isNaN(nuevaFecha.getTime())) {
+       Logger.log(`Error: Fecha inválida proporcionada - ${datos.fecha}`);
+       return crearRespuestaJSON({ status: "error", message: `Fecha inválida: ${datos.fecha}` }, 400);
+    }
+
+    // 1. Buscar al usuario
+    for (let i = 0; i < datosUsuarios.length; i++) {
+      const fila = datosUsuarios[i];
+      const codigoActual = String(fila[colCodigoIndex]).trim();
+
+      if (codigoActual.toUpperCase() === String(datos.codigo).trim().toUpperCase()) {
+        userFound = true;
+        const rowIndex = i + DATA_START_ROW_NUMBER; // Fila real en la hoja
+
+        const oldDateValue = fila[colCursoIndex]; // Valor actual en la celda del curso
+        let update = false;
+
+        // Verificar si la celda está vacía o si la nueva fecha es más reciente
+        if (!oldDateValue || oldDateValue === "N/A" || oldDateValue === "") {
+          update = true; // Actualizar si está vacío o N/A
+          Logger.log(`Usuario ${datos.codigo}: Celda curso '${datos.curso}' vacía o N/A. Actualizando.`);
+        } else {
+          try {
+             const oldDate = new Date(oldDateValue);
+             // Solo actualizar si la fecha antigua es válida y la nueva es estrictamente mayor
+             if (!isNaN(oldDate.getTime()) && nuevaFecha > oldDate) {
+               update = true;
+               Logger.log(`Usuario ${datos.codigo}: Nueva fecha (${nuevaFecha}) es más reciente que la antigua (${oldDate}). Actualizando.`);
+             } else if (isNaN(oldDate.getTime())){
+                update = true; // Si la fecha antigua no era válida, sobrescribir.
+                Logger.log(`Usuario ${datos.codigo}: Fecha antigua '${oldDateValue}' no válida. Actualizando.`);
+             } else {
+                Logger.log(`Usuario ${datos.codigo}: Fecha antigua (${oldDate}) es igual o más reciente. No se actualiza.`);
+             }
+          } catch(dateError) {
+             // Si hay error al convertir fecha antigua, la sobrescribimos
+             update = true;
+             Logger.log(`Usuario ${datos.codigo}: Error al procesar fecha antigua '${oldDateValue}'. Actualizando.`);
+          }
+        }
+
+        if (update) {
+          // setValue usa fila y columna 1-indexadas
+          hoja.getRange(rowIndex, colCursoIndex + 1).setValue(nuevaFecha);
+          Logger.log(`Actualización exitosa para ${datos.codigo}, curso ${datos.curso}.`);
+          return crearRespuestaJSON({ status: "success", message: `Fecha de curso actualizada para ${datos.codigo}.` });
+        } else {
+          Logger.log(`No se requiere actualización para ${datos.codigo}, curso ${datos.curso}.`);
+          return crearRespuestaJSON({ status: "success", message: `La fecha registrada (${formatarFecha(oldDateValue)}) ya es igual o más reciente.` });
+        }
+      } // Fin if usuario encontrado
+    } // Fin bucle for
+
+    // 2. Si no se encuentra, crear nuevo usuario
+    if (!userFound) {
+      Logger.log(`Usuario ${datos.codigo} no encontrado. Creando nueva fila.`);
+      let newRow = new Array(headers.length).fill('N/A'); // Llenar con N/A por defecto
+
+      newRow[colCodigoIndex] = datos.codigo;
+      newRow[colNombreIndex] = nombreNuevo;
+      newRow[colDeptoIndex] = deptoNuevo;
+      newRow[colCursoIndex] = nuevaFecha; // Añadir la fecha del curso
+      // La columna ESTADO (colCursoIndex+1) se deja como N/A, la fórmula la calculará
+
+      hoja.appendRow(newRow);
+      Logger.log(`Nueva fila añadida para ${datos.codigo}.`);
+      return crearRespuestaJSON({ status: "success", message: `Nuevo usuario ${datos.codigo} creado y curso registrado.` });
+    }
+  } catch (error) {
+     Logger.log("registerInternalCourse falló con error: " + error.message + " Stack: " + error.stack);
+     return crearRespuestaJSON({ status: "error", message: "Error registrando curso interno: " + error.message }, 500);
+  }
+}
+
+// --- FUNCIÓN DE AYUDA: REGISTRAR CONTRATISTA ---
+function registerContractor(datos) {
+  Logger.log("registerContractor iniciado con datos: " + JSON.stringify(datos));
+  // Validación
+  if (!datos.identification || !datos.fullName || !datos.company) {
+     Logger.log("Error: Faltan datos (Cédula, Nombre, Empresa).");
+     return crearRespuestaJSON({ status: "error", message: "Faltan datos (Cédula, Nombre, Empresa)." }, 400);
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName(HOJA_CONTRATISTAS);
+    if (!hoja) {
+       Logger.log("Error: Hoja no encontrada: " + HOJA_CONTRATISTAS);
+       return crearRespuestaJSON({ status: "error", message: "Hoja no encontrada: " + HOJA_CONTRATISTAS }, 500);
+    }
+
+    // Leer encabezados
+    const headers = hoja.getRange(HEADER_ROW_NUMBER, 1, 1, hoja.getLastColumn()).getValues()[0];
+
+    // Crear nueva fila
+    let nuevaFila = new Array(headers.length).fill('N/A');
+
+    // Mapear columnas básicas
+    const colCedula = headers.indexOf('CEDULA');
+    const colNombre = headers.indexOf('NOMBRE');
+    const colEmpresa = headers.indexOf('EMPRESA');
+
+    if (colCedula > -1) nuevaFila[colCedula] = datos.identification;
+    if (colNombre > -1) nuevaFila[colNombre] = datos.fullName;
+    if (colEmpresa > -1) nuevaFila[colEmpresa] = datos.company;
+
+    // Mapear cursos iniciales (marcar como Pendiente)
+    if (datos.cursos && datos.cursos.length > 0) {
+      Logger.log("Añadiendo cursos iniciales para contratista: " + datos.cursos.join(', '));
+      for (const nombreCursoForm of datos.cursos) {
+        const cursoIndex = headers.indexOf(nombreCursoForm); // Buscar nombre exacto
+        if (cursoIndex > -1) {
+          // Columna de Fecha del curso (cursoIndex) queda como N/A
+          // Columna de Estado del curso (cursoIndex + 1) se pone Pendiente
+          if (cursoIndex + 1 < nuevaFila.length) {
+              nuevaFila[cursoIndex + 1] = "Pendiente";
+              Logger.log(`Curso '${nombreCursoForm}' marcado como Pendiente.`);
+          } else {
+              Logger.log(`Advertencia: No se encontró columna de ESTADO para el curso '${nombreCursoForm}'.`);
+          }
+        } else {
+            Logger.log(`Advertencia: Curso '${nombreCursoForm}' del formulario no encontrado como encabezado.`);
+        }
+      }
+    }
+
+    // Añadir fila a la hoja
+    hoja.appendRow(nuevaFila);
+    Logger.log("Contratista registrado exitosamente.");
+    return crearRespuestaJSON({ status: "success", message: "Contratista registrado con éxito." });
+  } catch (error) {
+     Logger.log("registerContractor falló con error: " + error.message + " Stack: " + error.stack);
+     return crearRespuestaJSON({ status: "error", message: "Error registrando contratista: " + error.message }, 500);
+  }
+}
+
+// --- FUNCIONES UTILITARIAS (Deben estar al final) ---
+
+/**
+ * Formatea fechas que vienen de Google Sheets para enviarlas al HTML.
+ * Convierte objetos Date a formato YYYY-MM-DD.
+ * Devuelve texto o 'N/A' si no es una fecha válida.
+ */
+function formatarFecha(fechaInput) {
+  // Si la entrada está vacía, es nula o explícitamente "N/A", devolver "N/A"
+  if (!fechaInput || fechaInput === "" || String(fechaInput).toUpperCase() === "N/A") {
+    return "N/A";
+  }
+
+  try {
+    // Intentar convertir la entrada a un objeto Date de JavaScript
+    const fecha = new Date(fechaInput);
+
+    // Verificar si la conversión resultó en una fecha válida
+    if (isNaN(fecha.getTime())) {
+       // Si no es una fecha válida (ej: el texto "Pendiente"), devolver el texto original
+       // Logger.log(`formatarFecha: Entrada '${fechaInput}' no es una fecha válida. Devolviendo original.`); // Log opcional
+       return String(fechaInput);
+    }
+
+    // Si es una fecha válida, formatearla como YYYY-MM-DD
+    // Usamos getUTCFullYear, getUTCMonth, getUTCDate para evitar problemas de zona horaria
+    const year = fecha.getUTCFullYear();
+    const month = String(fecha.getUTCMonth() + 1).padStart(2, '0'); // getUTCMonth es 0-indexado (0 = Enero)
+    const day = String(fecha.getUTCDate()).padStart(2, '0');
+
+    const formattedDate = `${year}-${month}-${day}`;
+    // Logger.log(`formatarFecha: Entrada '${fechaInput}' formateada a '${formattedDate}'.`); // Log opcional
+    return formattedDate; // Devolver YYYY-MM-DD
+
+  } catch (e) {
+    // Si ocurre un error inesperado durante la conversión
+    Logger.log(`formatarFecha: Error procesando '${fechaInput}': ${e}. Devolviendo original.`);
+    return String(fechaInput); // Devolver el texto original como fallback
+  }
+}
+
+
+/**
+ * Crea una respuesta JSON estándar para enviar al frontend.
+ * @param {Object} data - El objeto JavaScript que se convertirá a JSON.
+ * @param {number} [statusCode=200] - El código de estado HTTP (no se usa directamente en GAS pero es buena práctica).
+ * @return {GoogleAppsScript.Content.TextOutput} - La salida de texto en formato JSON.
+ */
+function crearRespuestaJSON(data, statusCode = 200) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+// <-- FIN DEL ARCHIVO Code.gs -->

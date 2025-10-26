@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Submarine - Gestión de Capacitaciones Pozuelo</title>
+    <style>
+        :root {
+            --primary-color: #1a5276;
+            --secondary-color: #2980b9;
+            --accent-color: #f1c40f;
+            --text-color: #ffffff;
+            --bg-color: #0d47a1;
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --success-color: #2ecc71;
+            --warning-color: #e67e22;
+            --danger-color: #e74c3c;
+            --hover-color: rgba(255, 255, 255, 0.05);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, var(--bg-color), #0b3d91); min-height: 100vh; color: var(--text-color); overflow-x: hidden; position: relative; background-attachment: fixed; }
+        
+        @font-face {
+          font-family: 'Beatles Font'; 
+          src: url('https://raw.githubusercontent.com/Walfarod1/Fuentes/main/beatles.TTF') format('truetype'); 
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; position: relative; z-index: 10; }
+        header { text-align: center; padding: 20px 0; margin-bottom: 30px; }
+        .logo {
+            font-family: 'Beatles Font', sans-serif;
+            font-size: 4rem; /* <-- Increased size (try 4rem, 4.5rem, etc.) */
+            font-weight: normal;
+            /* ...other styles... */
+        }
+
+        .subtitle { font-size: 1.3rem; color: var(--accent-color); margin-bottom: 20px; }
+        
+        .switch-container { display: flex; justify-content: center; align-items: center; gap: 20px; margin-bottom: 20px; }
+        .switch-label { font-size: 0.9rem; font-weight: 600; transition: opacity 0.3s ease; }
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--secondary-color); transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(26px); }
+        
+        .search-container { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; }
+        .search-input { padding: 12px 20px; border-radius: 25px; border: none; background: rgba(255, 255, 255, 0.9); color: #333; font-size: 1rem; width: 300px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; }
+        .search-input:focus { outline: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); width: 350px; }
+        .search-btn, .reset-btn { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); border: none; }
+        .search-btn { background: var(--accent-color); color: var(--primary-color); }
+        .search-btn:hover { transform: scale(1.1); background: #e6b800; }
+        .reset-btn { background: var(--secondary-color); color: white; }
+        .reset-btn:hover { transform: scale(1.1); background: #1f618d; }
+        
+        .loader-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13, 71, 161, 0.7); backdrop-filter: blur(5px); z-index: 9998; justify-content: center; align-items: center; }
+        .loader-container.visible { display: flex; }
+        .loader-spinner { width: 60px; height: 60px; border: 5px solid var(--accent-color); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .user-info { background: var(--card-bg); border-radius: 15px; padding: 20px; margin-bottom: 30px; border: 1px solid var(--card-border); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); display: none; }
+        .user-info.visible { display: block; }
+        .info-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+        .info-item { flex: 1; min-width: 200px; }
+        .info-label { font-size: 0.8rem; color: var(--accent-color); font-weight: 600; margin-bottom: 5px; }
+        .info-value { font-size: 1.2rem; font-weight: bold; }
+        
+        .courses-table { background: var(--card-bg); border-radius: 15px; padding: 20px; margin-bottom: 30px; border: 1px solid var(--card-border); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); display: none; overflow-x: auto; }
+        .courses-table.visible { display: block; }
+        .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; background: rgba(0, 0, 0, 0.2); padding: 12px 15px; border-radius: 10px 10px 0 0; font-weight: bold; border-bottom: 1px solid var(--card-border); min-width: 600px; }
+        .table-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 12px 15px; border-bottom: 1px solid var(--card-border); align-items: center; min-width: 600px; }
+        .table-row:last-child { border-bottom: none; border-radius: 0 0 10px 10px; }
+        .course-name { font-weight: 600; }
+        .status-badge { padding: 4px 8px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; text-align: center; display: inline-block; min-width: 80px; }
+        .status-approved { background: var(--success-color); color: white; }
+        .status-pending { background: var(--warning-color); color: white; }
+        .status-expired { background: var(--danger-color); color: white; }
+        
+        .submarine-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; animation: float 3s ease-in-out infinite; }
+        .submarine {
+            width: 150px;
+            height: 150px;
+            /* ¡ASEGÚRATE DE QUE ESTA LÍNEA TENGA LA URL CORRECTA! */
+            background-image: url('https://raw.githubusercontent.com/Walfarod1/Fuentes/9f8c1f90d6435d308a6f185cfaa3828e4fec2688/beatles-yellow-submarine-album-seeklogo.svg'); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.3));
+        }
+
+        @keyframes float { 0% { transform: translateX(-50%) translateY(0px) rotate(0deg); } 50% { transform: translateX(-50%) translateY(-10px) rotate(2deg); } 100% { transform: translateX(-50%) translateY(0px) rotate(0deg); } }
+        
+        .register-btn { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: var(--accent-color); color: var(--primary-color); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); z-index: 100; transition: all 0.3s ease; }
+        .register-btn:hover { transform: scale(1.1); background: #e6b800; }
+        
+        .register-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #3498db, #9b59b6); border-radius: 15px; padding: 30px; width: 400px; max-width: 90%; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); z-index: 1000; display: none; }
+        .register-panel.visible { display: block; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
+        .panel-title { font-size: 1.5rem; font-weight: bold; color: var(--accent-color); }
+        .close-btn { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; transition: all 0.3s ease; }
+        .close-btn:hover { color: var(--accent-color); transform: rotate(90deg); }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 5px; font-weight: 600; color: white; }
+        .form-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); color: white; transition: all 0.3s ease; }
+        .form-input:focus { outline: none; border-color: var(--accent-color); background: rgba(255, 255, 255, 0.2); }
+        .checkbox-group { background: rgba(0, 0, 0, 0.2); border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+        .checkbox-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 10px; }
+        .checkbox-item { display: flex; align-items: center; gap: 5px; }
+        .checkbox-item input[type="checkbox"] { accent-color: var(--accent-color); width: 15px; height: 15px; }
+        .checkbox-item label { color: white; font-size: 0.9rem; }
+        .submit-btn { width: 100%; padding: 12px; border-radius: 25px; border: none; background: var(--accent-color); color: var(--primary-color); font-weight: bold; cursor: pointer; transition: all 0.3s ease; font-size: 1rem; }
+        .submit-btn:hover { background: #e6b800; transform: translateY(-2px); }
+        .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+        
+        .message { text-align: center; margin-top: 20px; font-size: 0.9rem; display: none; }
+        #errorMessage { color: var(--danger-color); font-weight: bold; background: rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 8px; }
+        #registerSuccess { color: var(--success-color); font-weight: bold; }
+        .message.visible { display: block; }
+        
+        .placeholder-message { text-align: center; margin-top: 50px; font-size: 1.1rem; color: rgba(255, 255, 255, 0.7); display: none; }
+        .placeholder-message.visible { display: block; }
+        
+        .water-effect { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: hidden; }
+        .wave { position: absolute; bottom: 0; left: 0; width: 100%; height: 100px; background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), transparent); animation: wave 10s linear infinite; }
+        .wave:nth-child(1) { animation-delay: 0s; opacity: 0.3; }
+        .wave:nth-child(2) { animation-delay: -5s; opacity: 0.2; height: 80px; }
+        @keyframes wave { 0% { background-position: 0 0; } 100% { background-position: 1000px 0; } }
+        .light-ray { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.05)); pointer-events: none; animation: lightRay 10s ease-in-out infinite; }
+        @keyframes lightRay { 0% { opacity: 0.5; transform: translateY(0); } 50% { opacity: 0.3; transform: translateY(-10px); } 100% { opacity: 0.5; transform: translateY(0); } }
+        
+        .bubbles-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1; pointer-events: none; }
+        .bubble { position: absolute; bottom: -100px; background: rgba(255, 255, 255, 0.05); border-radius: 50%; animation: bubble-up linear infinite; }
+        @keyframes bubble-up { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(-100vh); opacity: 0; } }
+        
+       .company-logo {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 100px;    /* <-- Reducido a 100px (ajusta este valor) */
+    height: auto;
+    z-index: 100;
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.3));
+}
+        .page-footer { position: fixed; bottom: 10px; left: 20px; color: rgba(255, 255, 255, 0.5); font-size: 0.8rem; font-weight: 600; z-index: 99; pointer-events: none; }
+        
+        #registerPanel #registerLabelInterno { opacity: 0.5; }
+        #registerPanel #registerLabelContratista { opacity: 1; }
+
+        @media (max-width: 768px) {
+            .logo { font-size: 2rem; }
+            .search-input { width: 250px; }
+            .info-row { flex-direction: column; }
+            .info-item { min-width: 100%; }
+            .table-header, .table-row { grid-template-columns: 2fr 1fr 1fr 1fr; font-size: 0.8rem; min-width: 600px; }
+            .register-panel { width: 90%; padding: 20px; }
+            .company-logo { top: 15px; left: 15px; width: 120px; }
+            .page-footer { font-size: 0.7rem; left: 15px; bottom: 5px; }
+        }
+        @media (max-width: 480px) {
+            .search-input { width: 200px; font-size: 0.9rem; }
+            .table-header, .table-row { font-size: 0.7rem; padding: 8px; }
+            .submarine { width: 100px; height: 100px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bubbles-container" id="bubblesContainer"></div>
+
+    <img src="https://raw.githubusercontent.com/Walfarod1/Fuentes/refs/heads/main/logo-pozuelo-gris.png" alt="Logo de la empresa" class="company-logo" id="companyLogo">
+
+    <div class="water-effect">
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="light-ray"></div>
+    </div>
+
+    <div class="loader-container" id="loader">
+        <div class="loader-spinner"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="logo">Training Submarine</div>
+            <div class="subtitle">Gestión de Capacitaciones Pozuelo</div>
+        </header>
+
+        <div class="switch-container">
+            <span class="switch-label">Colaborador Interno</span>
+            <label class="switch">
+                <input type="checkbox" id="employeeTypeSwitch">
+                <span class="slider"></span>
+            </label>
+            <span class="switch-label">Contratista</span>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="employeeCode" class="search-input" placeholder="Ingrese el Código...">
+            <div class="search-btn" id="searchBtn" title="Buscar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1v-1h.01V16z"/>
+ i                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1v-1h.01V16z"/>
+                </svg>
+            </div>
+            <div class="reset-btn" id="resetBtn" title="Limpiar búsqueda">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                  <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                  <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="placeholder-message" id="placeholderMessage">
+            <p>Listo para navegar. Ingrese un código para empezar la búsqueda.</p>
+        </div>
+
+        <div class="user-info" id="userInfo">
+            <div class="info-row">
+                <div class="info-item">
+                    <div class="info-label">CÓDIGO</div>
+                    <div class="info-value" id="userCode">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">NOMBRE COMPLETO</div>
+                    <div class="info-value" id="userName">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">DEPARTAMENTO</div>
+                    <div class="info-value" id="userDepartment">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="courses-table" id="coursesTable">
+            <div class="table-header">
+                <div>NOMBRE DEL CURSO</div>
+                <div>FECHA REALIZACIÓN</div>
+                <div>ESTADO</div>
+                <div>FECHA VENCIMIENTO</div>
+            </div>
+            <div id="coursesList">
+                </div>
+        </div>
+
+        <div class="message" id="errorMessage">
+            No se encontró información para este código.
+        </div>
+    </div>
+
+    <div class="submarine-container">
+        <div class="submarine"></div>
+    </div>
+
+    <div class="register-btn" id="registerBtn" title="Registrar Información">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M11 11.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-1z"/>
+            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+            <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3z"/>
+        </svg>
+    </div>
+
+    <div class="register-panel" id="registerPanel">
+        <div class="panel-header">
+            <div class="panel-title" id="registerPanelTitle">Registrar Contratista</div>
+            <button class="close-btn" id="closeRegisterPanel">×</button>
+        </div>
+        
+        <div class="switch-container" style="margin-bottom: 25px;">
+            <span class="switch-label" id="registerLabelContratista">Contratista</span>
+            <label class="switch">
+                <input type="checkbox" id="registerTypeSwitch">
+                <span class="slider"></span>
+            </label>
+            <span class="switch-label" id="registerLabelInterno">Interno</span>
+        </div>
+
+        <form id="formContratista">
+            <div class="form-group">
+                <label class="form-label">Nombre Completo</label>
+                <input type="text" class="form-input" id="fullName" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Cédula / Identificación</label>
+                <input type="text" class="form-input" id="identification" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Empresa Contratista</label>
+                <input type="text" class="form-input" id="company" required>
+            </div>
+            <div class="checkbox-group">
+                <div class="form-label">Cursos Requeridos (Iniciales)</div>
+                <div class="checkbox-row">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="highWork" name="courses" value="TRABAJOS EN ALTURA">
+                        <label for="highWork">Trabajos en Altura</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="hotWork" name="courses" value="TRABAJOS EN CALIENTE">
+                        <label for="hotWork">Trabajos en Caliente</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="loto" name="courses" value="LOTO">
+                        <label for="loto">LOTO</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="quimica" name="courses" value="SEGURIDAD QUIMICA">
+                        <label for="quimica">Seguridad Química</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="cargas" name="courses" value="LEVANTAMIENTO DE CARGAS">
+                        <label for="cargas">Levantamiento de Cargas</label>
+                    </div>
+                     <div class="checkbox-item">
+                        <input type="checkbox" id="especiales" name="courses" value="MANEJO DE EQUIP. ESPECIALES">
+                        <label for="especiales">Manejo Equip. Especiales</label>
+                    </div>
+                </div>
+            </div>
+        </form>
+        
+        <form id="formInterno" style="display: none;">
+            <div class="form-group">
+                <label class="form-label">Código de Empleado</label>
+                <input type="text" class="form-input" id="internalCode" required placeholder="Ej: 5658">
+            </div>
+             <div class="form-group">
+                <label class="form-label">Nombre Completo (Solo si es nuevo)</label>
+                <input type="text" class="form-input" id="internalName" placeholder="Ej: WILLIAM ALFARO">
+            </div>
+             <div class="form-group">
+                <label class="form-label">Departamento (Solo si es nuevo)</label>
+                <input type="text" class="form-input" id="internalDept" placeholder="Ej: SST">
+            </div>
+            <hr style="border: 1px solid var(--card-border); margin: 20px 0;">
+            <div class="form-group">
+                <label class="form-label">Curso Realizado</label>
+                <select class="form-input" id="internalCourseSelect" required>
+                    <option value="">Cargando cursos...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fecha de Realización</label>
+                <input type="date" class="form-input" id="internalDate" required>
+            </div>
+        </form>
+        
+        <button type="button" class="submit-btn" id="submitRegisterBtn">Registrar</button>
+        
+        <div class="message" id="registerSuccess">
+            Registro guardado con éxito.
+        </div>
+    </div>
+
+    <footer class="page-footer">
+        Desarrollado por PZWADELGADO
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- CONFIGURACIÓN ---
+            const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzV0Ib93Yc7M2t0gfUOungQ7RIa1F-CXOxq4o564pJRnSPShQZyJjSyI0u3_LriBY-q/exec'; // <-- RECUERDA PONER TU URL
+
+            // --- DOM Elements ---
+            const employeeCodeInput = document.getElementById('employeeCode');
+            const searchBtn = document.getElementById('searchBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const employeeTypeSwitch = document.getElementById('employeeTypeSwitch'); // Switch principal
+            const userInfo = document.getElementById('userInfo');
+            const coursesTable = document.getElementById('coursesTable');
+            const coursesList = document.getElementById('coursesList');
+            const placeholderMessage = document.getElementById('placeholderMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const loader = document.getElementById('loader');
+            const bubblesContainer = document.getElementById('bubblesContainer'); 
+            const labelInterno = document.querySelector('.container .switch-container .switch-label:first-of-type');
+            const labelContratista = document.querySelector('.container .switch-container .switch-label:last-of-type');
+
+            // --- DOM Elements del Panel de Registro ---
+            const registerBtn = document.getElementById('registerBtn');
+            const registerPanel = document.getElementById('registerPanel');
+            const closeRegisterPanel = document.getElementById('closeRegisterPanel');
+            const registerTypeSwitch = document.getElementById('registerTypeSwitch'); // Switch del panel
+            const registerPanelTitle = document.getElementById('registerPanelTitle');
+            const registerLabelInterno = document.getElementById('registerLabelInterno');
+            const registerLabelContratista = document.getElementById('registerLabelContratista');
+            const formContratista = document.getElementById('formContratista');
+            const formInterno = document.getElementById('formInterno');
+            const internalCourseSelect = document.getElementById('internalCourseSelect');
+            const submitRegisterBtn = document.getElementById('submitRegisterBtn'); 
+            const registerSuccess = document.getElementById('registerSuccess');
+
+
+            // --- Funciones de UI (Loader y Mensajes) ---
+            function showLoader() { loader.classList.add('visible'); }
+            function hideLoader() { loader.classList.remove('visible'); }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.classList.add('visible');
+                userInfo.classList.remove('visible');
+                coursesTable.classList.remove('visible');
+                placeholderMessage.classList.remove('visible');
+            }
+            
+            function showSuccessUI() {
+                errorMessage.classList.remove('visible');
+                userInfo.classList.add('visible');
+                coursesTable.classList.add('visible');
+                placeholderMessage.classList.remove('visible');
+            }
+            
+            function resetSearch() {
+                employeeCodeInput.value = '';
+                userInfo.classList.remove('visible');
+                coursesTable.classList.remove('visible');
+                placeholderMessage.classList.add('visible');
+                errorMessage.classList.remove('visible');
+                document.getElementById('userCode').textContent = '-';
+                document.getElementById('userName').textContent = '-';
+                document.getElementById('userDepartment').textContent = '-';
+                updateLabels(employeeTypeSwitch.checked);
+                coursesList.innerHTML = ''; 
+            }
+            
+            function updateLabels(isContractor) {
+                if (isContractor) {
+                    employeeCodeInput.placeholder = "Ingrese la Cédula...";
+                    document.querySelector('#userInfo .info-row .info-item:first-of-type .info-label').textContent = "CÉDULA";
+                    document.querySelector('#userInfo .info-row .info-item:last-of-type .info-label').textContent = "EMPRESA";
+                    labelInterno.style.opacity = "0.5";
+                    labelContratista.style.opacity = "1";
+                } else {
+                    employeeCodeInput.placeholder = "Ingrese el Código...";
+                    document.querySelector('#userInfo .info-row .info-item:first-of-type .info-label').textContent = "CÓDIGO";
+                    document.querySelector('#userInfo .info-row .info-item:last-of-type .info-label').textContent = "DEPARTAMENTO";
+                    labelInterno.style.opacity = "1";
+                    labelContratista.style.opacity = "0.5";
+                }
+            }
+
+            // --- Lógica Principal de Búsqueda ---
+            async function searchEmployee() {
+                const code = employeeCodeInput.value.trim();
+                if (!code) { showError("Por favor ingrese un código o cédula."); return; }
+                if (GAS_WEB_APP_URL === 'AQUI_VA_TU_URL_DE_APPS_SCRIPT') { showError("Error de configuración: Reemplace la URL de GAS_WEB_APP_URL."); return; }
+
+                const isContractor = employeeTypeSwitch.checked;
+                const employeeType = isContractor ? 'contratista' : 'interno';
+
+                showLoader();
+                errorMessage.classList.remove('visible');
+                userInfo.classList.remove('visible');
+                coursesTable.classList.remove('visible');
+                placeholderMessage.classList.remove('visible');
+
+                try {
+                    const url = new URL(GAS_WEB_APP_URL);
+                    url.searchParams.append('codigo', code); 
+                    url.searchParams.append('tipo', employeeType); 
+
+                    const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+                    const data = await response.json();
+                    if (data.error) { throw new Error(data.error); }
+
+                    displayEmployeeInfo(data);
+                    showSuccessUI();
+                } catch (error) {
+                    console.error('Error en fetch:', error);
+                    showError(`Error: ${error.message}. Verifique el dato o la conexión.`);
+                } finally {
+                    hideLoader();
+                }
+            }
+
+            // --- Función de ayuda para formatear fechas ---
+            function formatDateForDisplay(dateInput) {
+                if (!dateInput || dateInput === 'N/A' || dateInput === '') { return 'N/A'; }
+                try {
+                    const date = new Date(dateInput);
+                    if (isNaN(date.getTime())) { return dateInput; }
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0'); 
+                    const year = date.getFullYear();
+                    return `${month}/${day}/${year}`; // Formato MM/DD/YYYY
+                } catch (error) {
+                    return dateInput; 
+                }
+            }
+
+            // --- Lógica de Mostrar Datos ---
+            function displayEmployeeInfo(employee) {
+                document.getElementById('userCode').textContent = employee.codigo || '-';
+                document.getElementById('userName').textContent = employee.nombre || '-';
+                document.getElementById('userDepartment').textContent = employee.departamento || '-';
+                
+                coursesList.innerHTML = ''; 
+                
+                const cursosRelevantes = employee.cursos.filter(course => {
+                    const estado = String(course.estado).toLowerCase();
+                    return estado === 'aprobado' || estado === 'vencido';
+                });
+
+               if (cursosRelevantes.length > 0) {
+                    cursosRelevantes.forEach(course => {
+                        const row = document.createElement('div');
+                        row.classList.add('table-row');
+
+                        // Determinar clase CSS para el estado
+                        let statusClass = 'status-pending';
+                        const estado = String(course.estado).toLowerCase();
+                        if (estado === 'aprobado') { statusClass = 'status-approved'; }
+                        else if (estado === 'vencido') { statusClass = 'status-expired'; }
+
+                        // --- INICIO: Lógica de Fechas ---
+                        let fechaRealizacionFormateada = 'N/A';
+                        let fechaVencimientoCalculada = 'N/A';
+
+                        // 1. Intentar procesar la fecha de realización si existe y no es "N/A"
+                        if (course.fechaRealizacion && course.fechaRealizacion !== 'N/A') {
+                            try {
+                                // Intenta crear un objeto Date. Añadir 'T00:00:00' ayuda a evitar problemas de zona horaria al parsear YYYY-MM-DD
+                                const fechaRealizacionDate = new Date(course.fechaRealizacion + 'T00:00:00');
+
+                                // Comprueba si la fecha creada es válida
+                                if (!isNaN(fechaRealizacionDate.getTime())) {
+                                    // 2. Formatear la fecha de realización para mostrarla
+                                    fechaRealizacionFormateada = formatDateForDisplay(fechaRealizacionDate);
+
+                                    // 3. Calcular la fecha de vencimiento (añadir 2 años)
+                                    const fechaVencimientoDate = new Date(fechaRealizacionDate);
+                                    fechaVencimientoDate.setFullYear(fechaVencimientoDate.getFullYear() + 2);
+
+                                    // 4. Formatear la fecha de vencimiento para mostrarla
+                                    fechaVencimientoCalculada = formatDateForDisplay(fechaVencimientoDate);
+                                } else {
+                                    // Si no se pudo parsear como fecha válida, muestra el texto original
+                                    fechaRealizacionFormateada = course.fechaRealizacion;
+                                }
+                            } catch (e) {
+                                // En caso de error inesperado al procesar la fecha
+                                console.error("Error procesando fecha:", course.fechaRealizacion, e);
+                                fechaRealizacionFormateada = course.fechaRealizacion; // Muestra el texto original
+                            }
+                        }
+                        // --- FIN: Lógica de Fechas ---
+
+                        // Usar las fechas calculadas y formateadas
+                        row.innerHTML = `
+                            <div class="course-name">${course.nombre}</div>
+                            <div>${fechaRealizacionFormateada}</div>
+                            <div><span class="status-badge ${statusClass}">${course.estado}</span></div>
+                            <div>${fechaVencimientoCalculada}</div>
+                        `;
+                        coursesList.appendChild(row);
+                    });
+                } else {
+                    coursesList.innerHTML = '<div class="table-row" style="text-align: center; grid-column: 1 / -1; padding: 15px;">No se encontraron cursos completados o vencidos.</div>';
+                }
+            }
+
+            // --- Lógica del Panel de Registro ---
+            function toggleRegisterPanel() {
+                registerPanel.classList.toggle('visible');
+                registerSuccess.classList.remove('visible');
+                if (!registerPanel.classList.contains('visible')) {
+                    formContratista.reset();
+                    formInterno.reset();
+                }
+            }
+            
+            async function populateCourseList() {
+                console.log("Intentando cargar cursos..."); // <-- AÑADE ESTE LOG
+
+                // Evitar recargar si ya están cargados
+                if (internalCourseSelect.options.length > 1 && internalCourseSelect.options[0].value !== "") {
+                     console.log("Cursos ya cargados."); // <-- AÑADE ESTE LOG
+                     return;
+                }
+
+                // Asegúrate de que la URL no sea el placeholder
+                if (GAS_WEB_APP_URL === 'AQUI_VA_TU_URL_DE_APPS_SCRIPT') {
+                    console.error("Error: URL de GAS no configurada en populateCourseList."); // <-- AÑADE ESTE LOG
+                    internalCourseSelect.innerHTML = '<option value="">Error: URL no configurada</option>';
+                    return;
+                }
+
+                internalCourseSelect.innerHTML = '<option value="">Cargando cursos...</option>'; // Mostrar mensaje mientras carga
+
+                try {
+                    const url = new URL(GAS_WEB_APP_URL);
+                    url.searchParams.append('action', 'getCourses');
+
+                    console.log("Llamando a fetch para getCourses:", url.toString()); // <-- AÑADE ESTE LOG
+
+                    const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+
+                    // Verifica si la respuesta es OK antes de intentar parsear JSON
+                    if (!response.ok) {
+                        throw new Error(`Error de red: ${response.status} ${response.statusText}`);
+                    }
+
+                    const courses = await response.json();
+                    console.log("Cursos recibidos:", courses); // <-- AÑADE ESTE LOG
+
+                    if (courses && courses.length > 0) {
+                        internalCourseSelect.innerHTML = '<option value="">Seleccione un curso...</option>';
+                        courses.forEach(courseName => {
+                            const option = document.createElement('option');
+                            option.value = courseName;
+                            option.textContent = courseName;
+                            internalCourseSelect.appendChild(option);
+                        });
+                        console.log("Lista de cursos poblada."); // <-- AÑADE ESTE LOG
+                    } else {
+                        // Si la respuesta es un array vacío o algo inesperado pero no un error
+                        internalCourseSelect.innerHTML = '<option value="">No se encontraron cursos</option>';
+                         console.warn("Respuesta de getCourses vacía o inesperada:", courses); // <-- AÑADE ESTE LOG
+                    }
+                } catch (error) {
+                    console.error('Error cargando lista de cursos:', error); // <-- AÑADE ESTE LOG
+                    internalCourseSelect.innerHTML = `<option value="">Error al cargar: ${error.message}</option>`;
+                }
+            }
+
+            async function handleRegisterSubmit() {
+                if (GAS_WEB_APP_URL === 'AQUI_VA_TU_URL_DE_APPS_SCRIPT') {
+                    alert("Error de configuración: Reemplace la URL de GAS_WEB_APP_URL.");
+                    return;
+                }
+                
+                const submitBtn = submitRegisterBtn;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Registrando...';
+
+                let formData = {};
+                const isInternoForm = registerTypeSwitch.checked; // true si es Interno
+
+                if (isInternoForm) {
+                    // Recopilar datos de INTERNO
+                    formData = {
+                        registrationType: 'interno',
+                        codigo: document.getElementById('internalCode').value,
+                        nombre: document.getElementById('internalName').value,
+                        depto: document.getElementById('internalDept').value,
+                        curso: document.getElementById('internalCourseSelect').value,
+                        fecha: document.getElementById('internalDate').value
+                    };
+                } else {
+                    // Recopilar datos de CONTRATISTA
+                    formData = {
+                        registrationType: 'contratista',
+                        fullName: document.getElementById('fullName').value,
+                        identification: document.getElementById('identification').value,
+                        company: document.getElementById('company').value,
+                        cursos: Array.from(document.querySelectorAll('#formContratista input[name="courses"]:checked')).map(cb => cb.value)
+                    };
+                }
+
+                try {
+                    // ¡AQUÍ ESTÁ LA LÍNEA IMPORTANTE!
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: JSON.stringify(formData),
+                        headers: { 'Content-Type': 'application/json' },
+                        mode: 'no-cors' // <-- ESTA LÍNEA ES ESENCIAL
+                    });
+                    
+                    registerSuccess.textContent = "Registro enviado. Verifique la hoja de cálculo.";
+                    registerSuccess.classList.add('visible');
+                    formContratista.reset();
+                    formInterno.reset();
+                    
+                    setTimeout(toggleRegisterPanel, 2500);
+
+                } catch (error) {
+                    console.error('Error al registrar:', error);
+                    alert(`Error: ${error.message}`); 
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Registrar';
+                }
+            }
+
+            // --- Event Listeners ---
+            searchBtn.addEventListener('click', searchEmployee);
+            employeeCodeInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { searchEmployee(); } });
+            resetBtn.addEventListener('click', resetSearch);
+            employeeTypeSwitch.addEventListener('change', (e) => { updateLabels(e.target.checked); resetSearch(); });
+
+            // Listeners para el panel de registro
+            registerBtn.addEventListener('click', () => {
+                toggleRegisterPanel();
+                populateCourseList(); 
+            });
+            closeRegisterPanel.addEventListener('click', toggleRegisterPanel);
+            submitRegisterBtn.addEventListener('click', handleRegisterSubmit); 
+
+            registerTypeSwitch.addEventListener('change', (e) => {
+                const isInterno = e.target.checked;
+                if (isInterno) {
+                    formContratista.style.display = 'none';
+                    formInterno.style.display = 'block';
+                    registerPanelTitle.textContent = 'Registrar Curso Interno';
+                    registerLabelInterno.style.opacity = '1';
+                    registerLabelContratista.style.opacity = '0.5';
+                } else {
+                    formContratista.style.display = 'block';
+                    formInterno.style.display = 'none';
+                    registerPanelTitle.textContent = 'Registrar Contratista';
+                    registerLabelInterno.style.opacity = '0.5';
+                    registerLabelContratista.style.opacity = '1';
+                }
+            });
+
+            // Inicializar la página
+            resetSearch(); 
+
+            // --- Código de Burbujas (¡DENTRO DEL SCRIPT!) ---
+            function createBubble() {
+                const bubble = document.createElement('div');
+                bubble.classList.add('bubble');
+                const size = Math.random() * 60 + 20; 
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${Math.random() * 100}%`;
+                const animationDuration = Math.random() * 12 + 8; 
+                bubble.style.animationDuration = `${animationDuration}s`;
+                const animationDelay = Math.random() * 0.2;
+                bubble.style.animationDelay = `${animationDelay}s`;
+                bubblesContainer.appendChild(bubble);
+                bubble.addEventListener('animationend', () => { bubble.remove(); });
+            }
+            setInterval(createBubble, 1500); 
+            for (let i = 0; i < 5; i++) { createBubble(); }
+            // --- FIN Código de Burbujas ---
+
+            // --- Animación submarino ---
+            const submarine = document.querySelector('.submarine');
+            let direction = 1;
+            let sway = 0;
+            setInterval(() => {
+                sway += 0.5 * direction;
+                if (sway > 5 || sway < -5) { direction *= -1; }
+                let rotation = sway * 0.2;
+                submarine.style.transform = `translateY(${sway}px) rotate(${rotation}deg)`; 
+            }, 100);
+
+        });
+    </script>
+</body>
+</html>
